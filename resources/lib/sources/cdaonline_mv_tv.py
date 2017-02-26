@@ -30,8 +30,9 @@ from resources.lib import resolvers
 
 class source:
     def __init__(self):
-        self.base_link = 'https://cda-online.pl'
-        self.search_link = '/?s=%s'
+        self.base_link = 'https://cdax.tv'
+        self.search_link = '/wyszukiwarka?phrase=%s'
+        self.search_link2 = 'https://api.searchiq.xyz/api/search/results?q=%s&engineKey=%s&page=0&itemsPerPage=40&group=1'
         #self.episode_link = '-Season-%01d-Episode-%01d'
 
 
@@ -41,62 +42,78 @@ class source:
             query = urlparse.urljoin(self.base_link, query)
             control.log('cda-online URL %s' % query)
             result = client.request(query)
-            result = client.parseDOM(result, 'div', attrs={'class':'item'})
-            #print('cda-online',result)
-            result = [(client.parseDOM(i, 'a', ret='href')[0], client.parseDOM(i, 'h2')[0], client.parseDOM(i, 'span', attrs={'class':'year'})[0]) for i in result]
-            #print('cda-online2',result)
-            result = [i for i in result if cleantitle.movie(title) in cleantitle.movie(i[1])]
-            #print('cda-online3',result)
+            result = re.findall('engineKey: "(.*?)"', result)[0]
+            headers = {'Referer':query, 'Accept':'application/json, text/javascript, */*; q=0.01'}
+            result  = client.request(self.search_link2 %(urllib.quote_plus(title), result), headers=headers)
+            result = json.loads(result)
+            result = [(client.cleanhtmltags(i['title']), i['url'])for i in result['main']['records']]
+            result = [(i[0], re.findall('(\d{4})', i[0]),i[1]) for i in result]
+            #for i in result:
+            #    print('cda-online3', i[0], i[1])
+            result = [i for i in result if cleantitle.movie(title) in cleantitle.movie(i[0])]
             years = ['%s' % str(year), '%s' % str(int(year)+1), '%s' % str(int(year)-1)]
-            result = [i[0] for i in result if any(x in i[2] for x in years)][0]
-            #print('cda-online4',result)
+            print('>>cda-online4',result)
+
+            result = [i[2] for i in result if any(x in i[1] for x in years)][0]
+            print('cda-online4',result)
             try: url = re.compile('//.+?(/.+)').findall(result)[0]
             except: url = result
             url = client.replaceHTMLCodes(url)
             url = url.encode('utf-8')
-            control.log('ALLTUBE URL %s' % url)
+            control.log('CDAX URL %s' % url)
             return url
-        except:
+        except Exception as e:
+            control.log('CDAX getmovie ERROR  %s' % e)
             return
 
 
     def get_show(self, imdb, tvdb, tvshowtitle, year):
         try:
-            query = self.moviesearch_link % (urllib.unquote(tvshowtitle))
-            query = urlparse.urljoin(self.base_link, query)
-            control.log('ALLTUBE URL %s' % query)
-
-            result = client.source(query)
-            result = json.loads(result)
-            control.log('ALLTUBE URL %s' % result)
-
-            control.log('ALLTUBE tvshowtitle %s' % tvshowtitle)
-
-            tvshowtitle = cleantitle.tv(tvshowtitle)
-            control.log('ALLTUBE tvshowtitle %s' % tvshowtitle)
-
-            years = ['%s' % str(year), '%s' % str(int(year)+1), '%s' % str(int(year)-1)]
-            result = [(client.parseDOM(i, 'a', ret='href')[0], client.parseDOM(i, 'h2', ret='title')[0], client.parseDOM(i, 'span', attrs = {'itemprop': 'copyrightYear'})) for i in result]
-            result = [i for i in result if len(i[2]) > 0]
-            result = [i for i in result if tvshowtitle == cleantitle.tv(i[1])]
-            result = [i[0] for i in result if any(x in i[2][0] for x in years)][0]
-
-            try: url = re.compile('//.+?(/.+)').findall(result)[0]
-            except: url = result
-            url = client.replaceHTMLCodes(url)
-            url = url.encode('utf-8')
+            url = {'imdb': imdb, 'tvdb': tvdb, 'tvshowtitle': tvshowtitle, 'year': year}
+            url = urllib.urlencode(url)
             return url
         except:
             return
 
 
     def get_episode(self, url, imdb, tvdb, title, date, season, episode):
-        if url == None: return
+        try:
+            if url == None: return
 
-        url += self.episode_link % (int(season), int(episode))
-        url = client.replaceHTMLCodes(url)
-        url = url.encode('utf-8')
-        return url
+            url = urlparse.parse_qs(url)
+            tvshowtitle = url['tvshowtitle'][0]
+            year = url['year'][0]
+            print url, url['tvshowtitle'][0]
+            query = self.search_link % (urllib.quote_plus(tvshowtitle))
+            query = urlparse.urljoin(self.base_link, query)
+            control.log('cda-online URL %s' % query)
+            result = client.request(query)
+            result = re.findall('engineKey: "(.*?)"', result)[0]
+            headers = {'Referer':query, 'Accept':'application/json, text/javascript, */*; q=0.01'}
+            result  = client.request(self.search_link2 %(urllib.quote_plus(tvshowtitle), result), headers=headers)
+            result = json.loads(result)
+            result = [(client.cleanhtmltags(i['title']), i['url'])for i in result['main']['records']]
+            result = [i for i in result if 'seriale' in i[1]]
+
+            result = [i for i in result if cleantitle.movie(tvshowtitle) in cleantitle.movie(i[0])]
+            print "r",result, result[0][1]
+            result = client.request(result[0][1])
+            myyear = client.parseDOM(result, 'sup')
+            myepisode = '[s%02de%02d]' % (int(season), int(episode))
+            print "r",year, myepisode
+            years = ['%s' % str(year), '%s' % str(int(year)+1), '%s' % str(int(year)-1)]
+
+            if not any(x in myyear for x in years): return
+            r = client.parseDOM(result, 'div', {"id": "accordion"})[0]
+            r = client.parseDOM(r, 'li')
+            r = [(client.parseDOM(i, 'a', ret='href'), client.parseDOM(i, 'a')) for i in r]
+            r = [i[0][0] for i in r if myepisode in i[1][0]]
+            try: url = re.compile('//.+?(/.+)').findall(r[0])[0]
+            except: url = result
+
+            return url
+        except:
+            return
 
 
     def get_sources(self, url, hosthdDict, hostDict, locDict):
@@ -107,19 +124,27 @@ class source:
 
             url = urlparse.urljoin(self.base_link, url)
 
-            result = client.request(url)
-            links = client.parseDOM(result, 'div', attrs={'class':'movieplay'})
-            links = [client.parseDOM(i, 'iframe', ret='src')[0] for i in links]
+            link = client.request(url)
+            r = client.parseDOM(link, 'tr')
 
-            for i in links:
+            r = [(client.parseDOM(i, 'a', ret='href'),
+                  client.parseDOM(i, 'img', ret='alt'),
+                  client.parseDOM(i, 'td')
+                  ) for i in r]
+
+            r = [(i[0][0], i[1][0], i[2][0], i[2][1]) for i in r if len(i[0]) > 0]
+
+            for i in r:
+                control.log('CDAX HOSTS %s' % str(i))
+
+            for i in r:
                 try:
-                    host = urlparse.urlparse(i).netloc
+                    host = i[1]
                     host = host.replace('www.', '').replace('embed.', '')
-                    host = host.rsplit('.', 1)[0]
                     host = host.lower()
                     host = client.replaceHTMLCodes(host)
                     host = host.encode('utf-8')
-                    sources.append({'source': host, 'quality': 'SD', 'provider': 'CdaOnline', 'url': i, 'vtype':'BD'})
+                    sources.append({'source': host, 'quality': 'HD', 'provider': 'CdaOnline', 'url': i[0], 'vtype':i[2]})
                 except:
                     pass
 
@@ -132,8 +157,14 @@ class source:
         control.log('CDA-ONLINE RESOLVE URL %s' % url)
 
         try:
-            url = resolvers.request(url)
-            return url
+            if 'cdax.tv/link/redirect' in url:
+                link = client.request(url)
+                match = re.search('<a href="(.*?)" class="btn btn-primary">Link do strony z video</a>', link)
+                if match:
+                    linkVideo = match.group(1).split('http')[-1]
+                    linkVideo = 'http' + linkVideo
+                    return resolvers.request(linkVideo)
+            return resolvers.request(url)
         except:
             return
 

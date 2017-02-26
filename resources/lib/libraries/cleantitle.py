@@ -45,8 +45,15 @@ def query(title):
 
 def query2(title):
     if title == None: return
-    title = title.replace('\'', '').replace('-','').replace(':','')
+    title = title.replace('\'', '').replace('-','')
     return title
+
+def query10(title):
+    if title == None: return
+    title = title.replace('\'', '').replace(':','').replace('.','').replace(' ','-').lower()
+    return title
+
+
 
 def normalize(title):
     try:

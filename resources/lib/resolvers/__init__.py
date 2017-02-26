@@ -25,11 +25,11 @@ from resources.lib.libraries import client
 from resources.lib.libraries import control
 from resources.lib.resolvers import realdebrid
 from resources.lib.resolvers import premiumize
-
 try:
-    import urlresolver
-except:
     import urlresolver9 as urlresolver
+except:
+    pass
+
 
 def request(url):
     try:
@@ -52,7 +52,7 @@ def request(url):
 
         try:
             z=False
-            hmf = urlresolver.HostedMediaFile(url,include_disabled=True, include_universal=False)
+            hmf = urlresolver.HostedMediaFile(url,include_disabled=False, include_universal=False)
             if hmf:
                 print 'yay! we can resolve this one'
                 z = hmf.resolve()
@@ -83,8 +83,8 @@ def info():
         'netloc': ['ok.ru']
     }, {
         'class': '',
-        'netloc': ['youwatch.com','www.flashx.tv', 'thevideobee.to','auroravid.to'],
-        'host': ['youwatch', 'flashx', 'thevideobee','auroravid'],
+        'netloc': ['youwatch.com','www.flashx.tv', 'thevideobee.to','auroravid.to', 'vshare.eu','shared.sx'],
+        'host': ['youwatch', 'flashx', 'thevideobee','auroravid','vshare', 'shared'],
         'quality': 'Low',
         'captcha': False,
         'a/c': False
@@ -97,8 +97,8 @@ def info():
         'a/c': False
     }, {
         'class': 'allmyvideos',
-        'netloc': ['allmyvideos.net'],
-        'host': ['Allmyvideos'],
+        'netloc': ['allmyvideos.net', 'nosvideo.com','www.divxstage.to','noslocker.com'],
+        'host': ['Allmyvideos','nosvideo', 'divxstage','noslocker'],
         'quality': 'Medium',
         'captcha': False,
         'a/c': False
@@ -542,13 +542,13 @@ def info():
     }, {
         'class': 'vk',
         'netloc': ['vk.com']
-    }, {
-        'class': 'vodlocker',
-        'netloc': ['vodlocker.com'],
-        'host': ['Vodlocker'],
-        'quality': 'Low',
-        'captcha': False,
-        'a/c': False
+    #}, {
+    #    'class': 'vodlocker',
+    #    'netloc': ['vodlocker.com'],
+    #    'host': ['Vodlocker'],
+    #    'quality': 'Low',
+    #    'captcha': False,
+    #    'a/c': False
     }, {
         'class': 'xfileload',
         'netloc': ['xfileload.com'],
