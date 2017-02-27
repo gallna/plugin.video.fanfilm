@@ -40,8 +40,7 @@ from resources.lib.libraries import workers
 from resources.lib.resolvers import realdebrid
 from resources.lib.resolvers import premiumize
 
-
-
+import youtubedl
 from resources.lib import resolvers
 
 
@@ -186,102 +185,62 @@ class sources:
 
 
     def playItem(self, content, name, year, imdb, tvdb, source):
-        try:
-            control.resolve(int(sys.argv[1]), True, control.item(path=''))
-            control.execute('Dialog.Close(okdialog)')
+        control.resolve(int(sys.argv[1]), True, control.item(path=''))
+        control.execute('Dialog.Close(okdialog)')
 
-            next = [] ; prev = [] ; total = []
-            meta = None
+        next = [] ; prev = [] ; total = []
+        meta = None
 
-            for i in range(1,10000):
-                try:
-                    u = control.infoLabel('ListItem(%s).FolderPath' % str(i))
-                    if u in total: raise Exception()
-                    total.append(u)
-                    u = dict(urlparse.parse_qsl(u.replace('?','')))
-                    if 'meta' in u: meta = u['meta']
-                    u = json.loads(u['source'])[0]
-                    next.append(u)
-                except:
-                    break
-            for i in range(-10000,0)[::-1]:
-                try:
-                    u = control.infoLabel('ListItem(%s).FolderPath' % str(i))
-                    if u in total: raise Exception()
-                    total.append(u)
-                    u = dict(urlparse.parse_qsl(u.replace('?','')))
-                    if 'meta' in u: meta = u['meta']
-                    u = json.loads(u['source'])[0]
-                    prev.append(u)
-                except:
-                    break
+        for i in range(1,10000):
+            try:
+                u = control.infoLabel('ListItem(%s).FolderPath' % str(i))
+                if u in total: raise Exception()
+                total.append(u)
+                u = dict(urlparse.parse_qsl(u.replace('?','')))
+                if 'meta' in u: meta = u['meta']
+                u = json.loads(u['source'])[0]
+                next.append(u)
+            except:
+                break
+        for i in range(-10000,0)[::-1]:
+            try:
+                u = control.infoLabel('ListItem(%s).FolderPath' % str(i))
+                if u in total: raise Exception()
+                total.append(u)
+                u = dict(urlparse.parse_qsl(u.replace('?','')))
+                if 'meta' in u: meta = u['meta']
+                u = json.loads(u['source'])[0]
+                prev.append(u)
+            except:
+                break
 
-            items = json.loads(source)
+        items = json.loads(source)
 
-            source, quality = items[0]['source'], items[0]['quality']
-            items = [i for i in items+next+prev if i['quality'] == quality and i['source'] == source][:10]
-            items += [i for i in next+prev if i['quality'] == quality and not i['source'] == source][:10]
+        source, quality = items[0]['source'], items[0]['quality']
+        items = [i for i in items+next+prev if i['quality'] == quality and i['source'] == source][:10]
+        items += [i for i in next+prev if i['quality'] == quality and not i['source'] == source][:10]
 
-            self.progressDialog = control.progressDialog
-            self.progressDialog.create(control.addonInfo('name'), '')
-            self.progressDialog.update(0)
+        self.progressDialog = control.progressDialog
+        self.progressDialog.create(control.addonInfo('name'), '')
+        self.progressDialog.update(0)
 
-            block = None
+        i = 0
+        for url in youtubedl.queueItems(items):
+            self.progressDialog.update(int((100 / float(len(items))) * i), str(items[i]['label']), str(' '))
+            i += 1
+            if url is None:
+                continue
+            self.progressDialog.close()
+            break
 
-            for i in range(len(items)):
-                try:
-                    self.progressDialog.update(int((100 / float(len(items))) * i), str(items[i]['label']), str(' '))
+        if url == None: raise Exception()
+        if control.setting('playback_info') == 'true':
+            control.infoDialog(items[i]['label'], heading=name)
 
-                    if items[i]['source'] == block: raise Exception()
+        from resources.lib.libraries.player import player
+        player().run(content, name, url, year, imdb, tvdb, meta)
 
-                    w = workers.Thread(self.sourcesResolve, items[i]['url'], items[i]['provider'])
-                    w.start()
-
-                    m = ''
-
-                    for x in range(3600):
-                        if self.progressDialog.iscanceled(): return self.progressDialog.close()
-                        if xbmc.abortRequested == True: return sys.exit()
-                        k = control.condVisibility('Window.IsActive(virtualkeyboard)')
-                        if k: m += '1'; m = m[-1]
-                        if (w.is_alive() == False or x > 30) and not k: break
-                        time.sleep(1)
-
-                    for x in range(30):
-                        if m == '': break
-                        if self.progressDialog.iscanceled(): return self.progressDialog.close()
-                        if xbmc.abortRequested == True: return sys.exit()
-                        if w.is_alive() == False: break
-                        time.sleep(1)
-
-
-                    if w.is_alive() == True: block = items[i]['source']
-
-                    if self.url == None: raise Exception()
-
-                    try: self.progressDialog.close()
-                    except: pass
-
-                    control.sleep(200)
-
-                    if control.setting('playback_info') == 'true':
-                        control.infoDialog(items[i]['label'], heading=name)
-
-                    from resources.lib.libraries.player import player
-                    player().run(content, name, self.url, year, imdb, tvdb, meta)
-
-                    return self.url
-                except:
-                    pass
-
-            try: self.progressDialog.close()
-            except: pass
-
-            raise Exception()
-
-        except:
-            control.infoDialog(control.lang(30501).encode('utf-8'))
-            pass
+        return url
 
 
     def getSources(self, name, title, year, imdb, tmdb, tvdb, tvrage, season, episode, tvshowtitle, alter, date):

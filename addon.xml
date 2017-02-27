@@ -4,7 +4,8 @@
 		<import addon="xbmc.python" version="2.1.0" />
 		<import addon="script.module.requests"/>
 		<import addon="script.module.metahandler" />
-		<import addon="plugin.video.youtube" optional="true" />
+		<import addon="plugin.video.youtube"/>
+    <import addon="script.module.youtube.dl" />
 		<import addon="script.mrknow.urlresolver" />
 		<import addon="script.specto.media" />
 	</requires>
