@@ -224,23 +224,26 @@ class sources:
         self.progressDialog.create(control.addonInfo('name'), '')
         self.progressDialog.update(0)
 
-        i = 0
-        for url in youtubedl.queueItems(items):
-            self.progressDialog.update(int((100 / float(len(items))) * i), str(items[i]['label']), str(' '))
-            i += 1
-            if url is None:
+        size = len(items)
+        for i, item in youtubedl.queueItems(items):
+            if self.progressDialog.iscanceled():
+                return self.progressDialog.close()
+            if xbmc.abortRequested == True:
+                self.progressDialog.close()
+                return sys.exit()
+            self.progressDialog.update(int(100 / size) * i, str(item['label']), str(' '))
+            if item['url'] is None:
                 continue
+
             self.progressDialog.close()
-            break
+            if control.setting('playback_info') == 'true':
+                control.infoDialog(item['label'], heading=name)
+            from resources.lib.libraries.player import player
+            player().run(content, name, item['url'], year, imdb, tvdb, meta)
+            return item['url']
 
-        if url == None: raise Exception()
-        if control.setting('playback_info') == 'true':
-            control.infoDialog(items[i]['label'], heading=name)
-
-        from resources.lib.libraries.player import player
-        player().run(content, name, url, year, imdb, tvdb, meta)
-
-        return url
+        self.progressDialog.close()
+        control.infoDialog(control.lang(30501).encode('utf-8'))
 
 
     def getSources(self, name, title, year, imdb, tmdb, tvdb, tvrage, season, episode, tvshowtitle, alter, date):
